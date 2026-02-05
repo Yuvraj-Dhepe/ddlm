@@ -9,7 +9,7 @@ import random
 from typing import Tuple
 
 import torch
-from datasets import Dataset
+from datasets import Dataset, load_dataset
 from tokenizers import Tokenizer
 from tokenizers.decoders import ByteLevel as ByteLevelDecoder
 from tokenizers.models import BPE

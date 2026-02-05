@@ -4,8 +4,8 @@ Configuration module for the Diffusion Language Model training.
 This module contains the training parameters based on the run mode and the DiffusionLMConfig dataclass.
 """
 
-from typing import Dict, Any
 from dataclasses import dataclass
+from typing import Any, Dict
 
 
 def get_training_config(run_mode: str) -> Dict[str, Any]:
@@ -30,7 +30,7 @@ def get_training_config(run_mode: str) -> Dict[str, Any]:
     if run_mode == "quick":
         # Small + fast: good for verifying everything end-to-end
         TRAIN_EXAMPLES = 50_000
-        VAL_EXAMPLES   = 2_000
+        VAL_EXAMPLES = 2_000
         TOKENIZER_TRAIN_EXAMPLES = 30_000
 
         SEQ_LEN = 256
@@ -53,7 +53,7 @@ def get_training_config(run_mode: str) -> Dict[str, Any]:
     elif run_mode == "budget_100":
         # Heavier: better quality, uses more compute
         TRAIN_EXAMPLES = 1000_000
-        VAL_EXAMPLES   = 10_000
+        VAL_EXAMPLES = 10_000
         TOKENIZER_TRAIN_EXAMPLES = 150_000
 
         SEQ_LEN = 256
@@ -79,22 +79,22 @@ def get_training_config(run_mode: str) -> Dict[str, Any]:
     print("RUN_MODE:", run_mode)
 
     return {
-        'TRAIN_EXAMPLES': TRAIN_EXAMPLES,
-        'VAL_EXAMPLES': VAL_EXAMPLES,
-        'TOKENIZER_TRAIN_EXAMPLES': TOKENIZER_TRAIN_EXAMPLES,
-        'SEQ_LEN': SEQ_LEN,
-        'VOCAB_SIZE': VOCAB_SIZE,
-        'D_MODEL': D_MODEL,
-        'N_LAYERS': N_LAYERS,
-        'N_HEADS': N_HEADS,
-        'D_FF': D_FF,
-        'DIFFUSION_STEPS': DIFFUSION_STEPS,
-        'TRAIN_STEPS': TRAIN_STEPS,
-        'BATCH_SIZE': BATCH_SIZE,
-        'GRAD_ACCUM': GRAD_ACCUM,
-        'LR': LR,
-        'WEIGHT_DECAY': WEIGHT_DECAY,
-        'WARMUP_STEPS': WARMUP_STEPS,
+        "TRAIN_EXAMPLES": TRAIN_EXAMPLES,
+        "VAL_EXAMPLES": VAL_EXAMPLES,
+        "TOKENIZER_TRAIN_EXAMPLES": TOKENIZER_TRAIN_EXAMPLES,
+        "SEQ_LEN": SEQ_LEN,
+        "VOCAB_SIZE": VOCAB_SIZE,
+        "D_MODEL": D_MODEL,
+        "N_LAYERS": N_LAYERS,
+        "N_HEADS": N_HEADS,
+        "D_FF": D_FF,
+        "DIFFUSION_STEPS": DIFFUSION_STEPS,
+        "TRAIN_STEPS": TRAIN_STEPS,
+        "BATCH_SIZE": BATCH_SIZE,
+        "GRAD_ACCUM": GRAD_ACCUM,
+        "LR": LR,
+        "WEIGHT_DECAY": WEIGHT_DECAY,
+        "WARMUP_STEPS": WARMUP_STEPS,
     }
 
 
@@ -113,6 +113,7 @@ class DiffusionLMConfig:
         dropout (float): Dropout rate.
         diffusion_steps (int): Number of diffusion steps.
     """
+
     vocab_size: int
     seq_len: int
     d_model: int

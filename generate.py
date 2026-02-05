@@ -5,10 +5,12 @@ This module contains the function for generating text using diffusion sampling.
 """
 
 import math
-from typing import Tuple, List, Optional
+from typing import List, Optional, Tuple
+
 import torch
 import torch.nn.functional as F
 from transformers import PreTrainedTokenizerFast
+
 from model import DiffusionTransformerLM
 
 
@@ -44,7 +46,9 @@ def diffusion_generate(
     device = next(model.parameters()).device
 
     prompt_ids = tokenizer.encode(prompt_text, add_special_tokens=True)
-    prompt_ids = torch.tensor(prompt_ids, dtype=torch.long, device=device).unsqueeze(0)  # [1, Lp]
+    prompt_ids = torch.tensor(prompt_ids, dtype=torch.long, device=device).unsqueeze(
+        0
+    )  # [1, Lp]
 
     Lp = prompt_ids.size(1)
     L = min(seq_len, Lp + max_new_tokens)

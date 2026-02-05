@@ -119,9 +119,21 @@ python main.py --no-train --generate --render --user-prompt "Write a short story
 
 This creates `inference.gif` and `inference_cool.gif`.
 
-## Notes
+## Deployment
 
-- The model is trained from scratch on TinyStories, which teaches simple story generation.
-- Diffusion steps control the quality vs. speed trade-off.
-- GIFs show the progressive unmasking for a "cool" effect.
-- All code maintains the original notebook's logic and comments.
+Two deployment scripts are provided for running the pipeline on remote machines:
+
+### Shell Script (`deploy_and_run.sh`)
+```bash
+./deploy_and_run.sh user@remote-server.com ~/.ssh/my_key [run_mode] [user_prompt]
+```
+
+### Python Fabric Script (`deploy_fabric.py`)
+```bash
+uv run python deploy_fabric.py --address user@remote-server.com --ssh-key ~/.ssh/my_key --run-mode quick --user-prompt "Once upon a time"
+```
+
+Both scripts will:
+- Push the codebase to the remote machine
+- Install uv and dependencies
+- Run training, generation, and GIF creation

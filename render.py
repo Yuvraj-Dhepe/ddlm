@@ -6,9 +6,10 @@ This module contains functions to render frames and create GIFs from diffusion g
 
 import os
 from typing import List, Tuple
-from PIL import Image, ImageDraw, ImageFont
+
 import imageio.v2 as imageio
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont
 
 
 def get_mono_font(size: int):
@@ -31,7 +32,14 @@ def get_mono_font(size: int):
     return ImageFont.load_default()
 
 
-def render_terminal_frame(lines: List[str], width: int = 1200, height: int = 700, font_size: int = 20, margin: int = 20, line_spacing: int = 6) -> Image.Image:
+def render_terminal_frame(
+    lines: List[str],
+    width: int = 1200,
+    height: int = 700,
+    font_size: int = 20,
+    margin: int = 20,
+    line_spacing: int = 6,
+) -> Image.Image:
     """
     Render a terminal frame.
 
@@ -109,7 +117,12 @@ def make_chat_lines(user_msg: str, assistant_text: str) -> List[str]:
     return lines
 
 
-def create_gif(frames: List[Tuple[int, str]], diffusion_steps: int, user_prompt: str, gif_path: str = "inference.gif") -> None:
+def create_gif(
+    frames: List[Tuple[int, str]],
+    diffusion_steps: int,
+    user_prompt: str,
+    gif_path: str = "inference.gif",
+) -> None:
     """
     Create a GIF from frames.
 
@@ -120,7 +133,7 @@ def create_gif(frames: List[Tuple[int, str]], diffusion_steps: int, user_prompt:
         gif_path (str): Path to save GIF.
     """
     gif_frames = []
-    for (s, decoded) in frames:
+    for s, decoded in frames:
         lines = make_chat_lines(user_prompt, decoded)
         lines.insert(2, f"(diffusion step {s:03d}/{diffusion_steps:03d})")
         img = render_terminal_frame(lines)
@@ -130,7 +143,14 @@ def create_gif(frames: List[Tuple[int, str]], diffusion_steps: int, user_prompt:
     print("Saved:", gif_path)
 
 
-def render_terminal_frame_neon(lines: List[str], width: int = 1200, height: int = 700, font_size: int = 20, margin: int = 20, line_spacing: int = 6) -> Image.Image:
+def render_terminal_frame_neon(
+    lines: List[str],
+    width: int = 1200,
+    height: int = 700,
+    font_size: int = 20,
+    margin: int = 20,
+    line_spacing: int = 6,
+) -> Image.Image:
     """
     Render a neon-style terminal frame.
 
@@ -158,9 +178,9 @@ def render_terminal_frame_neon(lines: List[str], width: int = 1200, height: int 
     pixels = img.load()
     for py in range(height):
         t = py / height
-        r = int(12 * (1-t) + 4 * t)
-        g = int(12 * (1-t) + 4 * t)
-        b = int(28 * (1-t) + 12 * t)
+        r = int(12 * (1 - t) + 4 * t)
+        g = int(12 * (1 - t) + 4 * t)
+        b = int(28 * (1 - t) + 12 * t)
         for px in range(width):
             pixels[px, py] = (r, g, b)
 
@@ -170,17 +190,32 @@ def render_terminal_frame_neon(lines: List[str], width: int = 1200, height: int 
 
     # === CORNER BRACKETS ===
     cs = 25
-    draw.line([(6, 6+cs), (6, 6), (6+cs, 6)], fill=cyan, width=2)
-    draw.line([(width-6-cs, 6), (width-6, 6), (width-6, 6+cs)], fill=cyan, width=2)
-    draw.line([(6, height-6-cs), (6, height-6), (6+cs, height-6)], fill=magenta, width=2)
-    draw.line([(width-6-cs, height-6), (width-6, height-6), (width-6, height-6-cs)], fill=magenta, width=2)
+    draw.line([(6, 6 + cs), (6, 6), (6 + cs, 6)], fill=cyan, width=2)
+    draw.line(
+        [(width - 6 - cs, 6), (width - 6, 6), (width - 6, 6 + cs)], fill=cyan, width=2
+    )
+    draw.line(
+        [(6, height - 6 - cs), (6, height - 6), (6 + cs, height - 6)],
+        fill=magenta,
+        width=2,
+    )
+    draw.line(
+        [
+            (width - 6 - cs, height - 6),
+            (width - 6, height - 6),
+            (width - 6, height - 6 - cs),
+        ],
+        fill=magenta,
+        width=2,
+    )
 
     # === PARSE LINES FOR STEP INFO ===
     step_current, step_total = None, None
     for line in lines:
         if "diffusion step" in line.lower():
             import re
-            match = re.search(r'(\d+)/(\d+)', line)
+
+            match = re.search(r"(\d+)/(\d+)", line)
             if match:
                 step_current, step_total = int(match.group(1)), int(match.group(2))
                 break
@@ -190,13 +225,25 @@ def render_terminal_frame_neon(lines: List[str], width: int = 1200, height: int 
     for i, line in enumerate(lines):
         if "====" in line:
             # Header panel
-            header_text = line.replace("=", "").strip() or "◈ DIFFUSION LANGUAGE MODEL ◈"
-            draw.rounded_rectangle([margin, y-2, width-margin, y+font_size+8],
-                                  radius=5, fill=(15, 15, 30), outline=cyan, width=2)
-            draw.line([(margin+10, y), (width-margin-10, y)], fill=cyan, width=1)
+            header_text = (
+                line.replace("=", "").strip() or "◈ DIFFUSION LANGUAGE MODEL ◈"
+            )
+            draw.rounded_rectangle(
+                [margin, y - 2, width - margin, y + font_size + 8],
+                radius=5,
+                fill=(15, 15, 30),
+                outline=cyan,
+                width=2,
+            )
+            draw.line([(margin + 10, y), (width - margin - 10, y)], fill=cyan, width=1)
             for dx in [-1, 0, 1]:
                 for dy in [-1, 0, 1]:
-                    draw.text((margin + 15 + dx, y + 3 + dy), header_text, font=font, fill=(0, 80, 80))
+                    draw.text(
+                        (margin + 15 + dx, y + 3 + dy),
+                        header_text,
+                        font=font,
+                        fill=(0, 80, 80),
+                    )
             draw.text((margin + 15, y + 3), header_text, font=font, fill=cyan)
             y += font_size + line_spacing + 8
 
@@ -204,10 +251,15 @@ def render_terminal_frame_neon(lines: List[str], width: int = 1200, height: int 
             # Progress bar
             progress = step_current / step_total
             bar_x, bar_y = margin, y
-            bar_w, bar_h = width - margin*2 - 200, 20
+            bar_w, bar_h = width - margin * 2 - 200, 20
 
-            draw.rounded_rectangle([bar_x, bar_y, bar_x+bar_w, bar_y+bar_h],
-                                  radius=bar_h//2, fill=(20, 20, 35), outline=dim, width=1)
+            draw.rounded_rectangle(
+                [bar_x, bar_y, bar_x + bar_w, bar_y + bar_h],
+                radius=bar_h // 2,
+                fill=(20, 20, 35),
+                outline=dim,
+                width=1,
+            )
 
             seg_w, gap = 8, 3
             num_segs = (bar_w - 6) // (seg_w + gap)
@@ -217,18 +269,29 @@ def render_terminal_frame_neon(lines: List[str], width: int = 1200, height: int 
                 sx = bar_x + 3 + si * (seg_w + gap)
                 if si < filled:
                     t = si / max(num_segs - 1, 1)
-                    seg_color = (int(cyan[0]*(1-t) + magenta[0]*t),
-                                int(cyan[1]*(1-t) + magenta[1]*t),
-                                int(cyan[2]*(1-t) + magenta[2]*t))
+                    seg_color = (
+                        int(cyan[0] * (1 - t) + magenta[0] * t),
+                        int(cyan[1] * (1 - t) + magenta[1] * t),
+                        int(cyan[2] * (1 - t) + magenta[2] * t),
+                    )
                 else:
                     seg_color = (25, 25, 40)
-                draw.rounded_rectangle([sx, bar_y+3, sx+seg_w, bar_y+bar_h-3], radius=2, fill=seg_color)
+                draw.rounded_rectangle(
+                    [sx, bar_y + 3, sx + seg_w, bar_y + bar_h - 3],
+                    radius=2,
+                    fill=seg_color,
+                )
 
             step_text = f"STEP {step_current:03d}/{step_total:03d}"
             tx = width - margin - 180
             for dx in [-1, 0, 1]:
                 for dy in [-1, 0, 1]:
-                    draw.text((tx+dx, bar_y+dy), step_text, font=font_small, fill=(80, 50, 0))
+                    draw.text(
+                        (tx + dx, bar_y + dy),
+                        step_text,
+                        font=font_small,
+                        fill=(80, 50, 0),
+                    )
             draw.text((tx, bar_y), step_text, font=font_small, fill=orange)
             y += bar_h + line_spacing + 5
 
@@ -284,7 +347,12 @@ def render_terminal_frame_neon(lines: List[str], width: int = 1200, height: int 
     return img
 
 
-def create_cool_gif(frames: List[Tuple[int, str]], diffusion_steps: int, user_prompt: str, gif_path: str = "inference_cool.gif") -> None:
+def create_cool_gif(
+    frames: List[Tuple[int, str]],
+    diffusion_steps: int,
+    user_prompt: str,
+    gif_path: str = "inference_cool.gif",
+) -> None:
     """
     Create a cool neon GIF.
 
@@ -295,7 +363,7 @@ def create_cool_gif(frames: List[Tuple[int, str]], diffusion_steps: int, user_pr
         gif_path (str): Path to save GIF.
     """
     gif_frames = []
-    for (s, decoded) in frames:
+    for s, decoded in frames:
         lines = make_chat_lines(user_prompt, decoded)
         lines.insert(2, f"(diffusion step {s:03d}/{diffusion_steps:03d})")
         img = render_terminal_frame_neon(lines)

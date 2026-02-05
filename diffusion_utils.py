@@ -5,9 +5,11 @@ This module contains functions for masking, corruption, and loss calculation in 
 """
 
 from typing import Dict, Tuple
+
 import torch
 import torch.nn.functional as F
 from transformers import PreTrainedTokenizerFast
+
 from model import DiffusionTransformerLM
 
 
@@ -26,7 +28,13 @@ def mask_ratio_schedule(t: torch.Tensor, T: int) -> torch.Tensor:
     return t.float() / float(T)
 
 
-def corrupt_with_mask(input_ids: torch.Tensor, attention_mask: torch.Tensor, t: torch.Tensor, tokenizer: PreTrainedTokenizerFast, T: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+def corrupt_with_mask(
+    input_ids: torch.Tensor,
+    attention_mask: torch.Tensor,
+    t: torch.Tensor,
+    tokenizer: PreTrainedTokenizerFast,
+    T: int,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Corrupt input by masking tokens based on timestep.
 
@@ -45,7 +53,11 @@ def corrupt_with_mask(input_ids: torch.Tensor, attention_mask: torch.Tensor, t: 
     ratio = mask_ratio_schedule(t, T).unsqueeze(1)  # [B,1]
 
     can_mask = attention_mask.clone()
-    can_mask &= (input_ids != tokenizer.bos_token_id) & (input_ids != tokenizer.eos_token_id) & (input_ids != tokenizer.pad_token_id)
+    can_mask &= (
+        (input_ids != tokenizer.bos_token_id)
+        & (input_ids != tokenizer.eos_token_id)
+        & (input_ids != tokenizer.pad_token_id)
+    )
 
     rand = torch.rand((B, L), device=input_ids.device)
     mask_positions = (rand < ratio) & can_mask
@@ -59,7 +71,12 @@ def corrupt_with_mask(input_ids: torch.Tensor, attention_mask: torch.Tensor, t: 
     return noisy, labels, mask_positions
 
 
-def diffusion_loss(model: DiffusionTransformerLM, batch: Dict[str, torch.Tensor], tokenizer: PreTrainedTokenizerFast, T: int) -> torch.Tensor:
+def diffusion_loss(
+    model: DiffusionTransformerLM,
+    batch: Dict[str, torch.Tensor],
+    tokenizer: PreTrainedTokenizerFast,
+    T: int,
+) -> torch.Tensor:
     """
     Compute diffusion loss.
 

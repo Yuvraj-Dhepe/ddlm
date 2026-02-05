@@ -6,9 +6,8 @@ This module contains the DiffusionTransformerLM class, a bidirectional Transform
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+
 from config import DiffusionLMConfig
-from typing import Optional
 
 
 class DiffusionTransformerLM(nn.Module):
@@ -18,6 +17,7 @@ class DiffusionTransformerLM(nn.Module):
     Args:
         cfg (DiffusionLMConfig): Model configuration.
     """
+
     def __init__(self, cfg: DiffusionLMConfig):
         super().__init__()
         self.cfg = cfg
