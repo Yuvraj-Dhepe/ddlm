@@ -119,6 +119,16 @@ python main.py --no-train --generate --render --user-prompt "Write a short story
 
 This creates `inference.gif` and `inference_cool.gif`.
 
+## Outputs
+
+The pipeline creates an `outputs/` folder containing:
+- `model.pt`: Trained model weights
+- `config.json`: Model configuration
+- `tokenizer/`: Saved tokenizer
+- `loss_plot.jpg`: Training loss plot (DPI 300)
+- `inference.gif`: Basic terminal-style GIF
+- `inference_cool.gif`: Neon-themed GIF
+
 ## Deployment
 
 Two deployment scripts are provided for running the pipeline on remote machines:
@@ -137,3 +147,5 @@ Both scripts will:
 - Push the codebase to the remote machine
 - Install uv and dependencies
 - Run training, generation, and GIF creation
+- Compress outputs to `outputs.tar.gz`
+- Download and extract to local `outputs/YYYYMMDD_HHMMSS/` folder

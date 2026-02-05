@@ -47,7 +47,19 @@ ssh -i $SSH_KEY $SSH_ADDRESS << EOF
     echo "Running training, generation, and GIF creation..."
     uv run python main.py --run-mode $RUN_MODE --train --generate --render --user-prompt "$USER_PROMPT"
 
-    echo "Process completed. Check checkpoints/ and inference*.gif files."
+    echo "Compressing outputs..."
+    tar czf outputs.tar.gz outputs/
+
+    echo "Process completed."
 EOF
 
-echo "Deployment and execution completed successfully!"
+echo "Downloading outputs..."
+scp -i $SSH_KEY $SSH_ADDRESS:~/ddlm/outputs.tar.gz .
+
+echo "Extracting to local outputs folder..."
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+mkdir -p outputs/$TIMESTAMP
+tar xzf outputs.tar.gz -C outputs/$TIMESTAMP
+rm outputs.tar.gz
+
+echo "Outputs extracted to: outputs/$TIMESTAMP"

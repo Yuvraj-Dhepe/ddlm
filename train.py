@@ -8,6 +8,7 @@ import json
 import os
 from typing import Any, Dict
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from accelerate import Accelerator
@@ -84,6 +85,7 @@ def train_model(
         cfg (dict): Training configuration.
         accelerator: Accelerator instance.
     """
+    os.makedirs("outputs", exist_ok=True)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=cfg["LR"], weight_decay=cfg["WEIGHT_DECAY"]
     )
@@ -142,8 +144,7 @@ def train_model(
             print(f"\nStep {step + 1} | val_loss ~ {val_l:.4f}")
 
     if accelerator.is_main_process:
-        OUT_DIR = "checkpoints/final"
-        os.makedirs(OUT_DIR, exist_ok=True)
+        OUT_DIR = "outputs"
         torch.save(
             accelerator.unwrap_model(model).state_dict(),
             os.path.join(OUT_DIR, "model.pt"),
@@ -152,3 +153,13 @@ def train_model(
             json.dump(cfg, f, indent=2)
         tokenizer.save_pretrained(os.path.join(OUT_DIR, "tokenizer"))
         print("Saved final checkpoint to:", OUT_DIR)
+
+        # Plot training loss
+        plt.figure(figsize=(10, 6))
+        plt.plot(running)
+        plt.xlabel("Step")
+        plt.ylabel("Loss")
+        plt.title("Training Loss")
+        plt.savefig("outputs/loss_plot.jpg", dpi=300, bbox_inches="tight")
+        plt.close()
+        print("Saved loss plot to: outputs/loss_plot.jpg")

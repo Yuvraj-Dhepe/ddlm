@@ -121,7 +121,7 @@ def create_gif(
     frames: List[Tuple[int, str]],
     diffusion_steps: int,
     user_prompt: str,
-    gif_path: str = "inference.gif",
+    gif_path: str = "outputs/inference.gif",
 ) -> None:
     """
     Create a GIF from frames.
@@ -351,7 +351,7 @@ def create_cool_gif(
     frames: List[Tuple[int, str]],
     diffusion_steps: int,
     user_prompt: str,
-    gif_path: str = "inference_cool.gif",
+    gif_path: str = "outputs/inference_cool.gif",
 ) -> None:
     """
     Create a cool neon GIF.

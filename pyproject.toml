@@ -1,7 +1,7 @@
 [project]
 name = "ddlm"
 version = "0.1.0"
-description = "Diffusion Language Model from TinyStories"
+description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -18,5 +18,6 @@ dependencies = [
     "hf_transfer",
     "click",
     "fabric",
+    "matplotlib",
     "ruff>=0.15.0",
 ]

@@ -8,6 +8,7 @@ import click
 import torch
 from accelerate import Accelerator
 
+from classic_render import create_classic_gif
 from config import DiffusionLMConfig, get_training_config
 from data import (
     create_data_loaders,
@@ -87,16 +88,53 @@ def main(
             # Assume checkpoint exists
             import json
 
-            with open("checkpoints/final/config.json", "r") as f:
-                cfg = json.load(f)
-            model_cfg = DiffusionLMConfig(**cfg)
-            model = DiffusionTransformerLM(model_cfg)
-            model.load_state_dict(torch.load("checkpoints/final/model.pt"))
             from transformers import PreTrainedTokenizerFast
 
             tokenizer = PreTrainedTokenizerFast(
-                tokenizer_file="checkpoints/final/tokenizer/tokenizer.json"
+                tokenizer_file="outputs/tokenizer/tokenizer.json"
             )
+            tokenizer.pad_token = "[PAD]"
+            tokenizer.unk_token = "[UNK]"
+            tokenizer.bos_token = "[BOS]"
+            tokenizer.eos_token = "[EOS]"
+            tokenizer.mask_token = "[MASK]"
+
+            tokenizer.add_special_tokens(
+                {
+                    "additional_special_tokens": [
+                        "<|user|>",
+                        "<|assistant|>",
+                        "<|system|>",
+                        "<|end|>",
+                    ]
+                }
+            )
+
+            try:
+                with open("outputs/config.json", "r") as f:
+                    cfg = json.load(f)
+            except (json.JSONDecodeError, FileNotFoundError):
+                # Fallback to default config if config.json is missing or empty
+                cfg = get_training_config("quick")
+            model_cfg = DiffusionLMConfig(
+                vocab_size=len(tokenizer),
+                seq_len=cfg["SEQ_LEN"],
+                d_model=cfg["D_MODEL"],
+                n_layers=cfg["N_LAYERS"],
+                n_heads=cfg["N_HEADS"],
+                d_ff=cfg["D_FF"],
+                dropout=0.1,
+                diffusion_steps=cfg["DIFFUSION_STEPS"],
+            )
+            model = DiffusionTransformerLM(model_cfg)
+            try:
+                model.load_state_dict(torch.load("outputs/model.pt"))
+            except (FileNotFoundError, RuntimeError):
+                print(
+                    "Model checkpoint not found or corrupted. Please train the model first."
+                )
+                return
+            model = accelerator.prepare(model)
 
         prompt_text = chat_prompt(user_prompt)
 
@@ -107,8 +145,8 @@ def main(
             seq_len=cfg["SEQ_LEN"],
             max_new_tokens=128,
             diffusion_steps=cfg["DIFFUSION_STEPS"],
-            temperature=1.0,
-            top_k=50,
+            temperature=0.7,
+            top_k=40,
             record_steps=True,
         )
 
@@ -119,9 +157,12 @@ def main(
     if render:
         if not generate:
             raise ValueError("Cannot render without generating")
-        create_gif(frames, cfg["DIFFUSION_STEPS"], user_prompt, "inference.gif")
+        create_gif(frames, cfg["DIFFUSION_STEPS"], user_prompt, "outputs/inference.gif")
         create_cool_gif(
-            frames, cfg["DIFFUSION_STEPS"], user_prompt, "inference_cool.gif"
+            frames, cfg["DIFFUSION_STEPS"], user_prompt, "outputs/inference_cool.gif"
+        )
+        create_classic_gif(
+            frames, cfg["DIFFUSION_STEPS"], user_prompt, "outputs/inference_classic.gif"
         )
 
 
