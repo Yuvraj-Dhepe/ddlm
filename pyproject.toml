@@ -17,4 +17,5 @@ dependencies = [
     "transformers",
     "hf_transfer",
     "click",
+    "ruff>=0.15.0",
 ]

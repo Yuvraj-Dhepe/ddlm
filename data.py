@@ -6,18 +6,19 @@ This module handles the TinyStories dataset loading, tokenizer training from scr
 
 import os
 import random
-from typing import Tuple, Optional
+from typing import Tuple
+
 import torch
 from datasets import Dataset
 from tokenizers import Tokenizer
-from tokenizers.models import BPE
-from tokenizers.trainers import BpeTrainer
-from tokenizers.pre_tokenizers import ByteLevel
 from tokenizers.decoders import ByteLevel as ByteLevelDecoder
+from tokenizers.models import BPE
 from tokenizers.normalizers import NFKC
+from tokenizers.pre_tokenizers import ByteLevel
 from tokenizers.processors import TemplateProcessing
+from tokenizers.trainers import BpeTrainer
+from torch.utils.data import DataLoader, IterableDataset
 from transformers import PreTrainedTokenizerFast
-from torch.utils.data import IterableDataset, DataLoader
 
 
 def load_datasets(train_examples: int, val_examples: int) -> Tuple[Dataset, Dataset]:
@@ -34,14 +35,18 @@ def load_datasets(train_examples: int, val_examples: int) -> Tuple[Dataset, Data
     # !pip uninstall numpy -y --quiet
     # !pip install numpy==1.23.5 --quiet
     train_ds = load_dataset("roneneldan/TinyStories", split=f"train[:{train_examples}]")
-    val_ds   = load_dataset("roneneldan/TinyStories", split=f"validation[:{val_examples}]")
+    val_ds = load_dataset(
+        "roneneldan/TinyStories", split=f"validation[:{val_examples}]"
+    )
 
     print(train_ds, val_ds)
     print("\nExample:\n", train_ds[0]["text"][:500])
     return train_ds, val_ds
 
 
-def train_tokenizer_from_scratch(train_ds: Dataset, vocab_size: int, tokenizer_train_examples: int) -> str:
+def train_tokenizer_from_scratch(
+    train_ds: Dataset, vocab_size: int, tokenizer_train_examples: int
+) -> str:
     """
     Train a Byte-level BPE tokenizer from scratch.
 
@@ -54,8 +59,15 @@ def train_tokenizer_from_scratch(train_ds: Dataset, vocab_size: int, tokenizer_t
         str: Path to the saved tokenizer file.
     """
     SPECIAL_TOKENS = [
-        "[PAD]", "[UNK]", "[BOS]", "[EOS]", "[MASK]",
-        "<|user|>", "<|assistant|>", "<|system|>", "<|end|>",
+        "[PAD]",
+        "[UNK]",
+        "[BOS]",
+        "[EOS]",
+        "[MASK]",
+        "<|user|>",
+        "<|assistant|>",
+        "<|system|>",
+        "<|end|>",
     ]
 
     def tokenizer_training_iterator(ds, n_examples):
@@ -75,8 +87,7 @@ def train_tokenizer_from_scratch(train_ds: Dataset, vocab_size: int, tokenizer_t
 
     print("Training tokenizer...")
     tokenizer.train_from_iterator(
-        tokenizer_training_iterator(train_ds, tokenizer_train_examples),
-        trainer=trainer
+        tokenizer_training_iterator(train_ds, tokenizer_train_examples), trainer=trainer
     )
 
     bos_id = tokenizer.token_to_id("[BOS]")
@@ -109,20 +120,27 @@ def create_hf_tokenizer(tokenizer_file: str) -> PreTrainedTokenizerFast:
     """
     hf_tokenizer = PreTrainedTokenizerFast(tokenizer_file=tokenizer_file)
 
-    hf_tokenizer.pad_token  = "[PAD]"
-    hf_tokenizer.unk_token  = "[UNK]"
-    hf_tokenizer.bos_token  = "[BOS]"
-    hf_tokenizer.eos_token  = "[EOS]"
+    hf_tokenizer.pad_token = "[PAD]"
+    hf_tokenizer.unk_token = "[UNK]"
+    hf_tokenizer.bos_token = "[BOS]"
+    hf_tokenizer.eos_token = "[EOS]"
     hf_tokenizer.mask_token = "[MASK]"
 
-    hf_tokenizer.add_special_tokens({
-        "additional_special_tokens": ["<|user|>", "<|assistant|>", "<|system|>", "<|end|>"]
-    })
+    hf_tokenizer.add_special_tokens(
+        {
+            "additional_special_tokens": [
+                "<|user|>",
+                "<|assistant|>",
+                "<|system|>",
+                "<|end|>",
+            ]
+        }
+    )
 
-    PAD_ID  = hf_tokenizer.pad_token_id
+    PAD_ID = hf_tokenizer.pad_token_id
     MASK_ID = hf_tokenizer.mask_token_id
-    BOS_ID  = hf_tokenizer.bos_token_id
-    EOS_ID  = hf_tokenizer.eos_token_id
+    BOS_ID = hf_tokenizer.bos_token_id
+    EOS_ID = hf_tokenizer.eos_token_id
 
     print("PAD_ID:", PAD_ID, "MASK_ID:", MASK_ID, "BOS_ID:", BOS_ID, "EOS_ID:", EOS_ID)
     print("Example encoding:", hf_tokenizer.encode("Hello world!")[:20])
@@ -154,6 +172,7 @@ class TokenBlockDataset(IterableDataset):
         shuffle (bool): Whether to shuffle.
         seed (int): Random seed.
     """
+
     def __init__(self, hf_ds, tokenizer, seq_len, shuffle=False, seed=0):
         self.hf_ds = hf_ds
         self.tokenizer = tokenizer
@@ -174,12 +193,18 @@ class TokenBlockDataset(IterableDataset):
             buffer.extend(ids)
 
             while len(buffer) >= self.seq_len:
-                block = buffer[:self.seq_len]
-                buffer = buffer[self.seq_len:]
+                block = buffer[: self.seq_len]
+                buffer = buffer[self.seq_len :]
                 yield torch.tensor(block, dtype=torch.long)
 
 
-def create_data_loaders(train_ds: Dataset, val_ds: Dataset, tokenizer: PreTrainedTokenizerFast, seq_len: int, batch_size: int) -> Tuple[DataLoader, DataLoader]:
+def create_data_loaders(
+    train_ds: Dataset,
+    val_ds: Dataset,
+    tokenizer: PreTrainedTokenizerFast,
+    seq_len: int,
+    batch_size: int,
+) -> Tuple[DataLoader, DataLoader]:
     """
     Create training and validation data loaders.
 
@@ -193,16 +218,22 @@ def create_data_loaders(train_ds: Dataset, val_ds: Dataset, tokenizer: PreTraine
     Returns:
         tuple: (train_loader, val_loader)
     """
-    train_blocks = TokenBlockDataset(train_ds, tokenizer, seq_len, shuffle=True, seed=42)
-    val_blocks   = TokenBlockDataset(val_ds,   tokenizer, seq_len, shuffle=False)
+    train_blocks = TokenBlockDataset(
+        train_ds, tokenizer, seq_len, shuffle=True, seed=42
+    )
+    val_blocks = TokenBlockDataset(val_ds, tokenizer, seq_len, shuffle=False)
 
     def collate_blocks(batch):
         input_ids = torch.stack(batch, dim=0)  # [B, L]
-        attention_mask = (input_ids != tokenizer.pad_token_id)
+        attention_mask = input_ids != tokenizer.pad_token_id
         return {"input_ids": input_ids, "attention_mask": attention_mask}
 
-    train_loader = DataLoader(train_blocks, batch_size=batch_size, collate_fn=collate_blocks)
-    val_loader   = DataLoader(val_blocks,   batch_size=batch_size, collate_fn=collate_blocks)
+    train_loader = DataLoader(
+        train_blocks, batch_size=batch_size, collate_fn=collate_blocks
+    )
+    val_loader = DataLoader(
+        val_blocks, batch_size=batch_size, collate_fn=collate_blocks
+    )
 
     b = next(iter(train_loader))
     print({k: v.shape for k, v in b.items()})
