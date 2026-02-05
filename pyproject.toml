@@ -1,0 +1,20 @@
+[project]
+name = "ddlm"
+version = "0.1.0"
+description = "Diffusion Language Model from TinyStories"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "torch",
+    "datasets",
+    "tokenizers",
+    "accelerate",
+    "tqdm",
+    "numpy",
+    "einops",
+    "imageio",
+    "pillow",
+    "transformers",
+    "hf_transfer",
+    "click",
+]
