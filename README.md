@@ -2,8 +2,6 @@
 
 This project implements a **discrete diffusion language model** (a masked-denoising Transformer) trained from random initialization on a small slice of TinyStories. It performs **diffusion sampling** and exports **terminal-looking inference GIFs**.
 
-The notebook has been broken down into modular Python files for better organization and maintainability.
-
 ## Overview
 
 Autoregressive (AR) LMs generate **left-to-right**:
@@ -21,131 +19,135 @@ This gives the "cool" effect where the output looks like it's being *edited into
 
 ## File Structure
 
-### `config.py`
-- **Purpose**: Contains configuration parameters and the `DiffusionLMConfig` dataclass.
-- **Functions**:
-  - `get_training_config(run_mode)`: Returns training parameters based on run mode ("quick" or "budget_100").
-- **Details**: Defines model hyperparameters, training settings, and dataset sizes. The run mode controls whether to use a quick setup for testing or a more intensive budget setup for better quality.
+```
+ddlm/
+├── main.py                      # Entry point
+├── scripts/
+│   └── sweep.py                 # Hyperparameter sweep script
+├── src/
+│   ├── config/
+│   │   └── config.py            # Configuration and hyperparameters
+│   ├── data/
+│   │   └── data.py              # Dataset loading, tokenizer, data loaders
+│   ├── models/
+│   │   └── model.py             # DiffusionTransformerLM architecture
+│   ├── training/
+│   │   └── train.py             # Training loop and evaluation
+│   ├── generation/
+│   │   └── generate.py          # Diffusion sampling for generation
+│   ├── utils/
+│   │   └── diffusion_utils.py   # Corruption and loss functions
+│   └── visualization/
+│       ├── render.py            # Basic and neon GIF rendering
+│       └── classic_render.py   # Modern minimal GIF rendering
+├── sweeps/                      # Sweep outputs
+├── tokenizer_from_scratch/      # Trained tokenizer files
+└── docs/
+    └── DDLM_code_explnation.md  # Comprehensive documentation
+```
 
-### `data.py`
-- **Purpose**: Handles dataset loading, tokenizer training, and data preparation.
-- **Functions**:
-  - `load_datasets(train_examples, val_examples)`: Loads TinyStories train and validation datasets.
-  - `train_tokenizer_from_scratch(train_ds, vocab_size, tokenizer_train_examples)`: Trains a Byte-level BPE tokenizer.
-  - `create_hf_tokenizer(tokenizer_file)`: Creates a HuggingFace tokenizer from the trained tokenizer.
-  - `format_as_chat(story_text)`: Formats story text into chat format.
-  - `TokenBlockDataset`: Iterable dataset for token blocks.
-  - `create_data_loaders(train_ds, val_ds, tokenizer, seq_len, batch_size)`: Creates training and validation data loaders.
-- **Details**: Prepares the data by loading TinyStories, training a custom tokenizer with special tokens like `[MASK]`, `[BOS]`, etc., and creating batched datasets for training.
+## Usage
 
-### `model.py`
-- **Purpose**: Defines the Diffusion Language Model architecture.
-- **Classes**:
-  - `DiffusionTransformerLM`: A bidirectional Transformer with token embeddings, position embeddings, time-step embeddings, and a Transformer encoder.
-- **Details**: Implements the core model that predicts original tokens at masked positions during training. Uses a standard Transformer architecture with modifications for diffusion.
+### Training
 
-### `diffusion_utils.py`
-- **Purpose**: Contains utilities for diffusion corruption and loss calculation.
-- **Functions**:
-  - `mask_ratio_schedule(t, T)`: Linear masking ratio schedule.
-  - `corrupt_with_mask(input_ids, attention_mask, t, tokenizer, T)`: Corrupts input by masking tokens.
-  - `diffusion_loss(model, batch, tokenizer, T)`: Computes diffusion loss.
-- **Details**: Handles the diffusion process by masking tokens based on timestep and calculating the loss for training the model to denoise.
+```bash
+# Quick mode (for testing)
+python main.py --run-mode quick --train
 
-### `train.py`
-- **Purpose**: Manages the training loop and evaluation.
-- **Functions**:
-  - `eval_loss(model, val_loader, tokenizer, diffusion_steps, accelerator, n_batches)`: Evaluates validation loss.
-  - `train_model(model, train_loader, val_loader, tokenizer, cfg, accelerator)`: Runs the full training loop.
-- **Details**: Uses Accelerate for distributed training, implements gradient accumulation, learning rate scheduling, and saves the final checkpoint.
+# Full training (better quality)
+python main.py --run-mode budget_100 --train
+```
 
-### `generate.py`
-- **Purpose**: Handles text generation using diffusion sampling.
-- **Functions**:
-  - `diffusion_generate(model, tokenizer, prompt_text, seq_len, ...)`: Generates text by iteratively denoising.
-  - `chat_prompt(user_msg, system_msg)`: Creates chat-formatted prompts.
-- **Details**: Implements the sampling process where the model starts with masked sequences and progressively unmasks confident predictions.
+### Generation
 
-### `render.py`
-- **Purpose**: Creates terminal-style GIFs from generation frames.
-- **Functions**:
-  - `render_terminal_frame(lines, ...)`: Renders a basic terminal frame.
-  - `render_terminal_frame_neon(lines, ...)`: Renders a neon-style terminal frame.
-  - `create_gif(frames, diffusion_steps, user_prompt, gif_path)`: Creates a GIF from frames.
-  - `create_cool_gif(...)`: Creates a neon-themed GIF.
-- **Details**: Uses PIL to draw terminal-like interfaces showing the diffusion process step-by-step, with options for different styles.
+```bash
+# Generate with custom prompt
+python main.py --no-train --generate --user-prompt "Once upon a time in a distant land"
 
-### `main.py`
-- **Purpose**: Orchestrates the entire pipeline using command-line arguments.
-- **Features**:
-  - Uses Click for CLI with options for run mode, training, generation, and rendering.
-  - Loads configurations, prepares data, trains model, generates text, and renders GIFs.
-- **Usage**:
-  ```bash
-  python main.py --run-mode quick --train --generate --render --user-prompt "Once upon a time"
-  ```
+# Generate and create GIFs
+python main.py --no-train --generate --render --user-prompt "Write a story about a brave knight"
+```
 
-## Installation and Dependencies
+### Full Pipeline
 
-Install required packages (from the original notebook):
+```bash
+# Train, generate, and render in one command
+python main.py --run-mode quick --train --generate --render --user-prompt "A curious cat"
+```
+
+### Command-Line Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--run-mode` | Training mode: "quick" or "budget_100" | "quick" |
+| `--train/--no-train` | Whether to train the model | True |
+| `--generate/--no-generate` | Whether to generate text | True |
+| `--render/--no-render` | Whether to render GIFs | True |
+| `--user-prompt` | Prompt for generation | "Once upon a time" |
+
+## Hyperparameter Sweeps
+
+Run hyperparameter optimization using Optuna + Weights & Biases:
+
+```bash
+python scripts/sweep.py \
+  --sweep-config src/config/sweeps/sweep.yaml \
+  --trials 3 \
+  --run-mode quick \
+  --user-prompt "Once upon a time"
+```
+
+Configuration is defined in `src/config/sweeps/sweep.yaml`. Each trial saves:
+- `model.pt` - Model weights
+- `tokenizer.json` - Trained tokenizer  
+- `inference.gif` - Generation visualization
+
+Output: `sweeps/{study_name}/trial_{run_id}/`
+
+## Installation
 
 ```bash
 pip install -U datasets tokenizers accelerate tqdm numpy einops imageio pillow transformers hf_transfer
 ```
 
-## Training
-
-To train the model:
-
-```bash
-python main.py --run-mode budget_100 --train
-```
-
-This will train on 1M examples with a larger model.
-
-For quick testing:
-
-```bash
-python main.py --run-mode quick --train
-```
-
-## Generation and Rendering
-
-After training, generate and render:
-
-```bash
-python main.py --no-train --generate --render --user-prompt "Write a short story about a cat."
-```
-
-This creates `inference.gif` and `inference_cool.gif`.
-
-## Outputs
-
-The pipeline creates an `outputs/` folder containing:
-- `model.pt`: Trained model weights
-- `config.json`: Model configuration
-- `tokenizer/`: Saved tokenizer
-- `loss_plot.jpg`: Training loss plot (DPI 300)
-- `inference.gif`: Basic terminal-style GIF
-- `inference_cool.gif`: Neon-themed GIF
-
 ## Deployment
 
-Two deployment scripts are provided for running the pipeline on remote machines:
-
-### Shell Script (`deploy_and_run.sh`)
+### Shell Script
 ```bash
 ./deploy_and_run.sh user@remote-server.com ~/.ssh/my_key [run_mode] [user_prompt]
 ```
 
-### Python Fabric Script (`deploy_fabric.py`)
+### Python Fabric Script
 ```bash
-uv run python deploy_fabric.py --address user@remote-server.com --ssh-key ~/.ssh/my_key --run-mode quick --user-prompt "Once upon a time"
+# Training pipeline
+uv run python deploy_fabric.py \
+  --address user@remote-server.com \
+  --ssh-key ~/.ssh/my_key \
+  --run-mode quick \
+  --user-prompt "Once upon a time"
+
+# Hyperparameter sweep
+uv run python deploy_fabric.py \
+  --address user@remote-server.com \
+  --ssh-key ~/.ssh/my_key \
+  --run-mode quick \
+  --run-sweep \
+  --sweep-trials 5 \
+  --wandb-api-key YOUR_WANDB_KEY \
+  --user-prompt "Once upon a time"
 ```
 
-Both scripts will:
-- Push the codebase to the remote machine
-- Install uv and dependencies
-- Run training, generation, and GIF creation
-- Compress outputs to `outputs.tar.gz`
-- Download and extract to local `outputs/YYYYMMDD_HHMMSS/` folder
+**Options:**
+| Option | Description |
+|--------|-------------|
+| `--address` | SSH address (user@host) |
+| `--ssh-key` | Path to SSH private key |
+| `--run-mode` | "quick" or "budget_100" |
+| `--user-prompt` | Prompt for generation |
+| `--run-sweep` | Run hyperparameter sweep instead of training |
+| `--sweep-trials` | Number of sweep trials (default: 3) |
+| `--wandb-api-key` | W&B API key for remote login (optional) |
+
+## Documentation
+
+For detailed documentation on model architecture, data pipeline, training process, and inference, see [`docs/DDLM_code_explnation.md`](docs/DDLM_code_explnation.md).
