@@ -18,13 +18,9 @@ from fabric import Connection
 UV_BIN = "~/.local/bin/uv"
 
 
-def setup_wandb(c, remote_dir: str, wandb_api_key: Optional[str] = None):
+def setup_wandb(c, wandb_api_key: Optional[str] = None):
     """Setup Weights & Biases login on remote machine."""
-    if wandb_api_key:
-        # Use provided API key
-        c.run(f'echo "{wandb_api_key}" > ~/.netrc && chmod 600 ~/.netrc')
-        c.run('sed -i "s|login.*|login {username}|" ~/.netrc')
-    else:
+    if not wandb_api_key:
         # Check if WANDB_API_KEY env var is set
         c.run(
             'if [ -z "$WANDB_API_KEY" ]; then '
@@ -123,7 +119,7 @@ def deploy_and_run(
     with Connection(
         host=host,
         user=user,
-        port=23223,
+        port=22,
         connect_kwargs={"key_filename": ssh_key},
     ) as c:
         print("Creating deployment archive...")
@@ -155,23 +151,42 @@ def deploy_and_run(
 
         with c.cd(remote_dir):
             print("Ensuring virtual environment exists...")
-            c.run(f"{UV_BIN} venv")
+            c.run(f"{UV_BIN} venv --clear")
 
             print("Installing dependencies...")
             c.run(f"{UV_BIN} sync")
 
             # Setup W&B
-            setup_wandb(c, remote_dir, wandb_api_key)
+            setup_wandb(c, wandb_api_key)
 
             if run_sweep:
                 print("Running hyperparameter sweep...")
-                cmd = (
-                    f"{UV_BIN} run python scripts/sweep.py "
-                    f"--sweep-config src/config/sweeps/sweep.yaml "
-                    f"--trials {sweep_trials} "
-                    f"--run-mode {run_mode} "
-                    f'--user-prompt "{user_prompt}"'
-                )
+                # Select sweep config based on run_mode
+                if run_mode == "quick":
+                    sweep_config = "src/config/sweeps/sweep_quick.yaml"
+                else:
+                    sweep_config = "src/config/sweeps/sweep.yaml"
+                
+                print(f"Using sweep config: {sweep_config}")
+                
+                # Set WANDB_API_KEY environment variable if provided
+                if wandb_api_key:
+                    cmd = (
+                        f'export WANDB_API_KEY="{wandb_api_key}" && '
+                        f"{UV_BIN} run python scripts/sweep.py "
+                        f"--sweep-config {sweep_config} "
+                        f"--trials {sweep_trials} "
+                        f"--run-mode {run_mode} "
+                        f'--user-prompt "{user_prompt}"'
+                    )
+                else:
+                    cmd = (
+                        f"{UV_BIN} run python scripts/sweep.py "
+                        f"--sweep-config {sweep_config} "
+                        f"--trials {sweep_trials} "
+                        f"--run-mode {run_mode} "
+                        f'--user-prompt "{user_prompt}"'
+                    )
                 c.run(cmd)
 
                 # Download sweeps

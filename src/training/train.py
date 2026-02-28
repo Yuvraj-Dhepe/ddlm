@@ -6,7 +6,7 @@ This module contains the training loop and evaluation functions.
 
 import json
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,6 +19,13 @@ from transformers import (
     get_cosine_schedule_with_warmup,
 )
 
+# Optional wandb import
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+
 from models.model import DiffusionTransformerLM
 from utils.diffusion_utils import diffusion_loss
 
@@ -30,6 +37,7 @@ def eval_loss(
     diffusion_steps: int,
     accelerator: Accelerator,
     n_batches: int = 20,
+    mask_schedule: str = "linear",
 ) -> float:
     """
     Evaluate validation loss.
@@ -41,6 +49,7 @@ def eval_loss(
         diffusion_steps (int): Number of diffusion steps.
         accelerator: Accelerator instance.
         n_batches (int): Number of batches to evaluate.
+        mask_schedule (str): Mask schedule type.
 
     Returns:
         float: Average loss.
@@ -52,7 +61,7 @@ def eval_loss(
             if i >= n_batches:
                 break
 
-            loss = diffusion_loss(model, batch, tokenizer, T=diffusion_steps)
+            loss = diffusion_loss(model, batch, tokenizer, T=diffusion_steps, schedule=mask_schedule)
 
             # gather across processes -> always make it 1D
             gathered = accelerator.gather(loss.detach().float().reshape(1))
@@ -76,6 +85,8 @@ def train_model(
     tokenizer: PreTrainedTokenizerFast,
     cfg: Dict[str, Any],
     accelerator: Accelerator,
+    mask_schedule: str = "linear",
+    wandb_run: Optional[Any] = None,
 ) -> None:
     """
     Train the diffusion model.
@@ -87,7 +98,12 @@ def train_model(
         tokenizer: Tokenizer.
         cfg (dict): Training configuration.
         accelerator: Accelerator instance.
+        mask_schedule (str): Mask schedule type - 'linear', 'cosine', 'quadratic',
+                            'sqrt', 'inv_sqrt', 'sigmoid', 'warmup', 'constant', 'cosine_inv'
+        wandb_run: Optional wandb run object for logging (if None and wandb available, will log locally)
     """
+    # Determine if we should log to wandb
+    log_to_wandb = WANDB_AVAILABLE and wandb_run is not None
     os.makedirs("outputs", exist_ok=True)
     optimizer = torch.optim.AdamW(
         model.parameters(), lr=cfg["LR"], weight_decay=cfg["WEIGHT_DECAY"]
@@ -110,6 +126,9 @@ def train_model(
         range(cfg["TRAIN_STEPS"]), disable=not accelerator.is_main_process
     )
     running = []
+    
+    if accelerator.is_main_process:
+        print(f"\n=== Training with mask schedule: {mask_schedule} ===")
 
     train_iter = iter(train_loader)
 
@@ -121,7 +140,7 @@ def train_model(
             batch = next(train_iter)
 
         loss = (
-            diffusion_loss(model, batch, tokenizer, T=cfg["DIFFUSION_STEPS"])
+            diffusion_loss(model, batch, tokenizer, T=cfg["DIFFUSION_STEPS"], schedule=mask_schedule)
             / cfg["GRAD_ACCUM"]
         )
         accelerator.backward(loss)
@@ -134,12 +153,23 @@ def train_model(
 
         running.append(loss.item() * cfg["GRAD_ACCUM"])
 
+        # Log training loss every step (already computed, so cheap)
+        if accelerator.is_main_process and log_to_wandb:
+            current_loss = loss.item() * cfg["GRAD_ACCUM"]
+            wandb.log({
+                "train/loss": current_loss,
+                "train/lr": scheduler.get_last_lr()[0],
+                "step": step + 1,
+            })
+        
         if (step + 1) % 50 == 0 and accelerator.is_main_process:
+            avg_loss = np.mean(running[-50:])
             pbar.set_description(
-                f"loss={np.mean(running[-50:]):.4f} lr={scheduler.get_last_lr()[0]:.2e}"
+                f"loss={avg_loss:.4f} lr={scheduler.get_last_lr()[0]:.2e}"
             )
 
-        if (step + 1) % 500 == 0 and accelerator.is_main_process:
+        # Log validation loss more frequently to monitor overfitting
+        if (step + 1) % 100 == 0 and accelerator.is_main_process:
             val_l = eval_loss(
                 model,
                 val_loader,
@@ -147,8 +177,15 @@ def train_model(
                 cfg["DIFFUSION_STEPS"],
                 accelerator,
                 n_batches=10,
+                mask_schedule=mask_schedule,
             )
             print(f"\nStep {step + 1} | val_loss ~ {val_l:.4f}")
+            # Log validation loss to wandb if available
+            if log_to_wandb:
+                wandb.log({
+                    "val/loss": val_l,
+                    "step": step + 1,
+                })
 
     if accelerator.is_main_process:
         OUT_DIR = "outputs"
@@ -156,8 +193,10 @@ def train_model(
             accelerator.unwrap_model(model).state_dict(),
             os.path.join(OUT_DIR, "model.pt"),
         )
+        # Include mask_schedule in saved config
+        cfg_with_schedule = {**cfg, "MASK_SCHEDULE": mask_schedule}
         with open(os.path.join(OUT_DIR, "config.json"), "w") as f:
-            json.dump(cfg, f, indent=2)
+            json.dump(cfg_with_schedule, f, indent=2)
         tokenizer.save_pretrained(os.path.join(OUT_DIR, "tokenizer"))
         print("Saved final checkpoint to:", OUT_DIR)
 

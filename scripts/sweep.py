@@ -137,6 +137,15 @@ def train_model_with_config(
 
     # Training loop
     total_loss = 0.0
+    # Log training loss every N steps to avoid too much logging
+    log_interval = max(
+        1, cfg["TRAIN_STEPS"] // 100
+    )  # ~100 log entries per training
+    # Log validation loss every M steps (less frequent than training to save time)
+    val_log_interval = max(
+        1, cfg["TRAIN_STEPS"] // 20
+    )  # ~20 val logs per training
+
     for step in tqdm(
         range(cfg["TRAIN_STEPS"]), disable=not accelerator.is_main_process
     ):
@@ -147,7 +156,13 @@ def train_model_with_config(
             batch = next(train_iter)
 
         loss = (
-            diffusion_loss(model, batch, tokenizer, T=cfg["DIFFUSION_STEPS"])
+            diffusion_loss(
+                model,
+                batch,
+                tokenizer,
+                T=cfg["DIFFUSION_STEPS"],
+                schedule=cfg.get("MASK_SCHEDULE", "linear"),
+            )
             / cfg["GRAD_ACCUM"]
         )
         accelerator.backward(loss)
@@ -160,6 +175,42 @@ def train_model_with_config(
 
         total_loss += loss.item() * cfg["GRAD_ACCUM"]
 
+        # Log training loss every step (already computed, so cheap)
+        wandb.log(
+            {
+                "train/loss": loss.item() * cfg["GRAD_ACCUM"],
+                "train/lr": scheduler.get_last_lr()[0],
+                "step": step + 1,
+            }
+        )
+
+        # Log validation loss periodically to monitor overfitting
+        if (step + 1) % val_log_interval == 0:
+            model.eval()
+            val_losses = []
+            with torch.no_grad():
+                for i, val_batch in enumerate(val_loader):
+                    if i >= 5:  # Quick eval on 5 batches
+                        break
+                    val_loss = diffusion_loss(
+                        model,
+                        val_batch,
+                        tokenizer,
+                        T=cfg["DIFFUSION_STEPS"],
+                        schedule=cfg.get("MASK_SCHEDULE", "linear"),
+                    )
+                    val_losses.append(val_loss.item())
+            model.train()
+
+            if val_losses:
+                avg_val_loss = np.mean(val_losses)
+                wandb.log(
+                    {
+                        "val/loss": avg_val_loss,
+                        "step": step + 1,
+                    }
+                )
+
     # Evaluate on validation set
     model.eval()
     val_losses = []
@@ -168,7 +219,11 @@ def train_model_with_config(
             if i >= 10:  # Evaluate on 10 batches
                 break
             loss = diffusion_loss(
-                model, batch, tokenizer, T=cfg["DIFFUSION_STEPS"]
+                model,
+                batch,
+                tokenizer,
+                T=cfg["DIFFUSION_STEPS"],
+                schedule=cfg.get("MASK_SCHEDULE", "linear"),
             )
             val_losses.append(loss.item())
 
@@ -264,6 +319,7 @@ def objective(
     d_model = suggested_params["d_model"]
     n_heads = suggested_params["n_heads"]
     diffusion_steps = suggested_params["diffusion_steps"]
+    mask_schedule = suggested_params.get("mask_schedule", "linear")
 
     # Ensure d_model is divisible by n_heads
     if d_model % n_heads != 0:
@@ -279,6 +335,7 @@ def objective(
     cfg["D_MODEL"] = d_model
     cfg["D_FF"] = 4 * d_model
     cfg["DIFFUSION_STEPS"] = diffusion_steps
+    cfg["MASK_SCHEDULE"] = mask_schedule
 
     try:
         # Train model
@@ -290,17 +347,17 @@ def objective(
         run_id = wandb.run.id
         output_dir = os.path.join("sweeps", study_name, f"trial_{run_id}")
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Save model weights
         model_path = os.path.join(output_dir, "model.pt")
         torch.save(accelerator.unwrap_model(model).state_dict(), model_path)
-        
+
         # Save tokenizer
         tokenizer_path = os.path.join(output_dir, "tokenizer.json")
-        tokenizer_file = f"tokenizer_from_scratch/tokenizer.json"
+        tokenizer_file = "tokenizer_from_scratch/tokenizer.json"
         if os.path.exists(tokenizer_file):
             shutil.copy(tokenizer_file, tokenizer_path)
-        
+
         print(f"Saved trial {trial.number} model to {model_path}")
         print(f"Saved tokenizer to {tokenizer_path}")
 
@@ -312,11 +369,13 @@ def objective(
             )
 
         # Log model path to wandb
-        wandb.log({
-            "model_path": model_path,
-            "tokenizer_path": tokenizer_path,
-            "val_loss": val_loss
-        })
+        wandb.log(
+            {
+                "model_path": model_path,
+                "tokenizer_path": tokenizer_path,
+                "val_loss": val_loss,
+            }
+        )
 
         # Cleanup
         del model
@@ -395,16 +454,25 @@ def run_sweep(
     # Get base configuration
     base_config = get_training_config(run_mode)
 
-    # Create Optuna study
+    # Create Optuna study with GridSampler to ensure all combinations are tried
+    # Build the search space from the YAML parameters
+    search_space = {}
+    for param_name, param_config in sweep_cfg.get("parameters", {}).items():
+        if param_config.get("type") == "categorical":
+            search_space[param_name] = param_config["choices"]
+
+    # Use GridSampler to exhaustively try all combinations
     study = optuna.create_study(
         direction=sweep_cfg["metric"]["goal"],
-        sampler=optuna.samplers.TPESampler(),
+        sampler=optuna.samplers.GridSampler(search_space),
         study_name=study_name,
     )
 
     # Run optimization (wandb is handled manually in each trial)
     study.optimize(
-        lambda trial: objective(trial, base_config, sweep_cfg, study_name, prompt),
+        lambda trial: objective(
+            trial, base_config, sweep_cfg, study_name, prompt
+        ),
         n_trials=trials,
     )
 

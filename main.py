@@ -40,8 +40,17 @@ from visualization.render import create_cool_gif, create_gif
     default="Once upon a time",
     help="User prompt for generation",
 )
+@click.option(
+    "--mask-schedule",
+    default="linear",
+    type=click.Choice(
+        ["linear", "cosine", "quadratic", "sqrt", "inv_sqrt", "sigmoid", "warmup", "constant", "cosine_inv"],
+        case_sensitive=False,
+    ),
+    help="Mask schedule type: linear (default), cosine, quadratic, sqrt, inv_sqrt, sigmoid, warmup, constant, cosine_inv",
+)
 def main(
-    run_mode: str, train: bool, generate: bool, render: bool, user_prompt: str
+    run_mode: str, train: bool, generate: bool, render: bool, user_prompt: str, mask_schedule: str
 ) -> None:
     """
     Main function to run the diffusion LM pipeline.
@@ -52,6 +61,7 @@ def main(
         generate (bool): Whether to generate.
         render (bool): Whether to render.
         user_prompt (str): Prompt for generation.
+        mask_schedule (str): Mask schedule type for training.
     """
     cfg = get_training_config(run_mode)
 
@@ -93,7 +103,8 @@ def main(
 
         # Train
         train_model(
-            model, train_loader, val_loader, tokenizer, cfg, accelerator
+            model, train_loader, val_loader, tokenizer, cfg, accelerator,
+            mask_schedule=mask_schedule
         )
 
     if generate:

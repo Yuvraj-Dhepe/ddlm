@@ -84,22 +84,38 @@ python main.py --run-mode quick --train --generate --render --user-prompt "A cur
 | `--generate/--no-generate` | Whether to generate text | True |
 | `--render/--no-render` | Whether to render GIFs | True |
 | `--user-prompt` | Prompt for generation | "Once upon a time" |
+| `--mask-schedule` | Mask schedule: linear, cosine, quadratic, sqrt, inv_sqrt, sigmoid, warmup, constant, cosine_inv | "linear" |
 
 ## Hyperparameter Sweeps
 
 Run hyperparameter optimization using Optuna + Weights & Biases:
 
 ```bash
+# Quick mode sweep (3 trials - one per mask schedule)
 python scripts/sweep.py \
-  --sweep-config src/config/sweeps/sweep.yaml \
+  --sweep-config src/config/sweeps/sweep_quick.yaml \
   --trials 3 \
   --run-mode quick \
   --user-prompt "Once upon a time"
+
+# Budget_100 mode sweep (9 trials - one per mask schedule)
+python scripts/sweep.py \
+  --sweep-config src/config/sweeps/sweep.yaml \
+  --trials 3 \
+  --run-mode budget_100 \
+  --user-prompt "Once upon a time"
 ```
 
-Configuration is defined in `src/config/sweeps/sweep.yaml`. Each trial saves:
+**Available sweep configs:**
+- `src/config/sweeps/sweep.yaml` - budget_100 settings (larger model, more steps)
+- `src/config/sweeps/sweep_quick.yaml` - quick settings (smaller model, fewer steps)
+
+Both configs vary only the `mask_schedule` parameter across 9 different schedules:
+- linear, cosine, quadratic, sqrt, inv_sqrt, sigmoid, warmup, constant, cosine_inv
+
+Each trial saves:
 - `model.pt` - Model weights
-- `tokenizer.json` - Trained tokenizer  
+- `tokenizer.json` - Trained tokenizer
 - `inference.gif` - Generation visualization
 
 Output: `sweeps/{study_name}/trial_{run_id}/`
@@ -119,21 +135,30 @@ pip install -U datasets tokenizers accelerate tqdm numpy einops imageio pillow t
 
 ### Python Fabric Script
 ```bash
-# Training pipeline
+# Training pipeline (quick mode)
 uv run python deploy_fabric.py \
   --address user@remote-server.com \
   --ssh-key ~/.ssh/my_key \
   --run-mode quick \
   --user-prompt "Once upon a time"
 
-# Hyperparameter sweep
+# Training pipeline (budget_100 mode)
 uv run python deploy_fabric.py \
   --address user@remote-server.com \
   --ssh-key ~/.ssh/my_key \
+  --run-mode budget_100 \
+  --user-prompt "Once upon a time"
+
+# Hyperparameter sweep (auto-selects sweep config based on run-mode)
+# quick mode -> sweep_quick.yaml (3 trials)
+# budget_100 mode -> sweep.yaml (3 trials)
+uv run python deploy_fabric.py \
+  --address shadeform@149.36.1.177 \
+  --ssh-key ~/.ssh/sform_key \
   --run-mode quick \
   --run-sweep \
-  --sweep-trials 5 \
-  --wandb-api-key YOUR_WANDB_KEY \
+  --sweep-trials 3 \
+  --wandb-api-key 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 \
   --user-prompt "Once upon a time"
 ```
 
@@ -145,8 +170,12 @@ uv run python deploy_fabric.py \
 | `--run-mode` | "quick" or "budget_100" |
 | `--user-prompt` | Prompt for generation |
 | `--run-sweep` | Run hyperparameter sweep instead of training |
-| `--sweep-trials` | Number of sweep trials (default: 3) |
+| `--sweep-trials` | Number of sweep trials (default: 3, use 9 for full mask schedule sweep) |
 | `--wandb-api-key` | W&B API key for remote login (optional) |
+
+**Note:** When `--run-sweep` is enabled, the script automatically selects:
+- `sweep_quick.yaml` for `quick` mode
+- `sweep.yaml` for `budget_100` mode
 
 ## Documentation
 
