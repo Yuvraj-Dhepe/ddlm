@@ -5,9 +5,9 @@ This module contains the DiffusionTransformerLM class, a bidirectional Transform
 """
 
 import torch
-import torch.nn as nn
+from torch import nn
 
-from config import DiffusionLMConfig
+from config.config import DiffusionLMConfig
 
 
 class DiffusionTransformerLM(nn.Module):
@@ -35,7 +35,9 @@ class DiffusionTransformerLM(nn.Module):
             activation="gelu",
             norm_first=True,
         )
-        self.encoder = nn.TransformerEncoder(enc_layer, num_layers=cfg.n_layers)
+        self.encoder = nn.TransformerEncoder(
+            enc_layer, num_layers=cfg.n_layers
+        )
         self.ln_f = nn.LayerNorm(cfg.d_model)
         self.lm_head = nn.Linear(cfg.d_model, cfg.vocab_size, bias=False)
 
@@ -51,7 +53,9 @@ class DiffusionTransformerLM(nn.Module):
 
         B, L = input_ids.shape
         if L > self.cfg.seq_len:
-            raise ValueError(f"Sequence length {L} > cfg.seq_len {self.cfg.seq_len}")
+            raise ValueError(
+                f"Sequence length {L} > cfg.seq_len {self.cfg.seq_len}"
+            )
 
         pos = torch.arange(L, device=input_ids.device).unsqueeze(0)  # [1, L]
         x = self.tok_emb(input_ids) + self.pos_emb(pos)

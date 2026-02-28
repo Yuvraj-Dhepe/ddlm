@@ -1,3 +1,5 @@
+outputs/
+wandb/
 temp/
 #.github
 .github/

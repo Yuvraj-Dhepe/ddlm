@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 from transformers import PreTrainedTokenizerFast
 
-from model import DiffusionTransformerLM
+from models.model import DiffusionTransformerLM
 
 
 def diffusion_generate(
@@ -46,15 +46,17 @@ def diffusion_generate(
     device = next(model.parameters()).device
 
     prompt_ids = tokenizer.encode(prompt_text, add_special_tokens=True)
-    prompt_ids = torch.tensor(prompt_ids, dtype=torch.long, device=device).unsqueeze(
-        0
-    )  # [1, Lp]
+    prompt_ids = torch.tensor(
+        prompt_ids, dtype=torch.long, device=device
+    ).unsqueeze(0)  # [1, Lp]
 
     Lp = prompt_ids.size(1)
     L = min(seq_len, Lp + max_new_tokens)
     gen_len = L - Lp
 
-    x = torch.full((1, L), tokenizer.mask_token_id, dtype=torch.long, device=device)
+    x = torch.full(
+        (1, L), tokenizer.mask_token_id, dtype=torch.long, device=device
+    )
     x[:, :Lp] = prompt_ids[:, :Lp]
 
     fixed = torch.zeros((1, L), dtype=torch.bool, device=device)
@@ -77,7 +79,9 @@ def diffusion_generate(
         probs = F.softmax(logits, dim=-1)
         flat = probs.view(-1, probs.size(-1))
         sampled = torch.multinomial(flat, num_samples=1).view(1, L)
-        sampled_prob = probs.gather(-1, sampled.unsqueeze(-1)).squeeze(-1)  # [1,L]
+        sampled_prob = probs.gather(-1, sampled.unsqueeze(-1)).squeeze(
+            -1
+        )  # [1,L]
         return sampled, sampled_prob
 
     for s in range(diffusion_steps, 0, -1):

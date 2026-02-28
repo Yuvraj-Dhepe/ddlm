@@ -20,4 +20,53 @@ dependencies = [
     "fabric",
     "matplotlib",
     "ruff>=0.15.0",
+    "nvitop>=1.6.2",
+    "optuna",
+    "wandb",
+    "optuna-integration[wandb]>=4.7.0",
 ]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 79
+fix = true
+# Optional: Enable preview rules for catching more subtle issues, but not fatal
+preview = false
+
+[tool.ruff.format]
+exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = [
+    "F",   # Pyflakes: unused vars, undefined names, bad calls
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "I",   # isort import sorting
+    "PL",  # Pylint rules
+]
+# Ignore overly pedantic or high-friction Pylint rules
+ignore = [
+    "PLR0913",  # Too many function arguments
+    "PLR2004",  # Magic value used in comparison
+    "PLR0915",  # Too many statements
+]
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+]
+
+fixable = ["ALL"]
+
+# Allow unused variables only if they match this regex (e.g., _ or _var)
+dummy-variable-rgx = "^(_+|(_[a-zA-Z0-9_]+)?)$"
+
+[tool.ruff.lint.isort]
+lines-between-types = 0

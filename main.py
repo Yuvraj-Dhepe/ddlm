@@ -8,27 +8,37 @@ import click
 import torch
 from accelerate import Accelerator
 
-from classic_render import create_classic_gif
-from config import DiffusionLMConfig, get_training_config
-from data import (
+from config.config import DiffusionLMConfig, get_training_config
+from data.data import (
     create_data_loaders,
     create_hf_tokenizer,
     load_datasets,
     train_tokenizer_from_scratch,
 )
-from generate import chat_prompt, diffusion_generate
-from model import DiffusionTransformerLM
-from render import create_cool_gif, create_gif
-from train import train_model
+from generation.generate import chat_prompt, diffusion_generate
+from models.model import DiffusionTransformerLM
+from training.train import train_model
+from visualization.classic_render import create_classic_gif
+from visualization.render import create_cool_gif, create_gif
 
 
 @click.command()
-@click.option("--run-mode", default="quick", help="Run mode: quick or budget_100")
-@click.option("--train/--no-train", default=True, help="Whether to train the model")
-@click.option("--generate/--no-generate", default=True, help="Whether to generate text")
-@click.option("--render/--no-render", default=True, help="Whether to render GIF")
 @click.option(
-    "--user-prompt", default="Once upon a time", help="User prompt for generation"
+    "--run-mode", default="quick", help="Run mode: quick or budget_100"
+)
+@click.option(
+    "--train/--no-train", default=True, help="Whether to train the model"
+)
+@click.option(
+    "--generate/--no-generate", default=True, help="Whether to generate text"
+)
+@click.option(
+    "--render/--no-render", default=True, help="Whether to render GIF"
+)
+@click.option(
+    "--user-prompt",
+    default="Once upon a time",
+    help="User prompt for generation",
 )
 def main(
     run_mode: str, train: bool, generate: bool, render: bool, user_prompt: str
@@ -53,7 +63,9 @@ def main(
 
     if train:
         # Load data
-        train_ds, val_ds = load_datasets(cfg["TRAIN_EXAMPLES"], cfg["VAL_EXAMPLES"])
+        train_ds, val_ds = load_datasets(
+            cfg["TRAIN_EXAMPLES"], cfg["VAL_EXAMPLES"]
+        )
 
         # Train tokenizer
         tokenizer_file = train_tokenizer_from_scratch(
@@ -80,7 +92,9 @@ def main(
         model = DiffusionTransformerLM(model_cfg)
 
         # Train
-        train_model(model, train_loader, val_loader, tokenizer, cfg, accelerator)
+        train_model(
+            model, train_loader, val_loader, tokenizer, cfg, accelerator
+        )
 
     if generate:
         # Load model and tokenizer if not trained
@@ -157,12 +171,23 @@ def main(
     if render:
         if not generate:
             raise ValueError("Cannot render without generating")
-        create_gif(frames, cfg["DIFFUSION_STEPS"], user_prompt, "outputs/inference.gif")
+        create_gif(
+            frames,
+            cfg["DIFFUSION_STEPS"],
+            user_prompt,
+            "outputs/inference.gif",
+        )
         create_cool_gif(
-            frames, cfg["DIFFUSION_STEPS"], user_prompt, "outputs/inference_cool.gif"
+            frames,
+            cfg["DIFFUSION_STEPS"],
+            user_prompt,
+            "outputs/inference_cool.gif",
         )
         create_classic_gif(
-            frames, cfg["DIFFUSION_STEPS"], user_prompt, "outputs/inference_classic.gif"
+            frames,
+            cfg["DIFFUSION_STEPS"],
+            user_prompt,
+            "outputs/inference_classic.gif",
         )
 
 

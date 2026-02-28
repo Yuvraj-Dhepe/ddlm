@@ -10,7 +10,7 @@ import torch
 import torch.nn.functional as F
 from transformers import PreTrainedTokenizerFast
 
-from model import DiffusionTransformerLM
+from models.model import DiffusionTransformerLM
 
 
 def mask_ratio_schedule(t: torch.Tensor, T: int) -> torch.Tensor:
@@ -103,7 +103,9 @@ def diffusion_loss(
         T=T,
     )
 
-    logits = model(noisy_ids, timesteps=t, attention_mask=attention_mask)  # [B,L,V]
+    logits = model(
+        noisy_ids, timesteps=t, attention_mask=attention_mask
+    )  # [B,L,V]
     loss = F.cross_entropy(
         logits.view(-1, logits.size(-1)),
         labels.view(-1),

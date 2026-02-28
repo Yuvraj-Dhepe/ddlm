@@ -14,10 +14,13 @@ import torch
 from accelerate import Accelerator
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
-from transformers import PreTrainedTokenizerFast, get_cosine_schedule_with_warmup
+from transformers import (
+    PreTrainedTokenizerFast,
+    get_cosine_schedule_with_warmup,
+)
 
-from diffusion_utils import diffusion_loss
-from model import DiffusionTransformerLM
+from models.model import DiffusionTransformerLM
+from utils.diffusion_utils import diffusion_loss
 
 
 def eval_loss(
@@ -96,12 +99,16 @@ def train_model(
         num_training_steps=cfg["TRAIN_STEPS"],
     )
 
-    model, optimizer, train_loader, val_loader, scheduler = accelerator.prepare(
-        model, optimizer, train_loader, val_loader, scheduler
+    model, optimizer, train_loader, val_loader, scheduler = (
+        accelerator.prepare(
+            model, optimizer, train_loader, val_loader, scheduler
+        )
     )
 
     model.train()
-    pbar = tqdm(range(cfg["TRAIN_STEPS"]), disable=not accelerator.is_main_process)
+    pbar = tqdm(
+        range(cfg["TRAIN_STEPS"]), disable=not accelerator.is_main_process
+    )
     running = []
 
     train_iter = iter(train_loader)
